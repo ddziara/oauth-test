@@ -1,0 +1,142 @@
+https://developers.facebook.com
+
+1. Create new app, give it a name
+
+2. In "App Settings" (Basic) set "App Domains" (from ngrok):
+
+https://5cf2-89-64-39-84.ngrok-free.app
+
+3. In "Products" click "Configure" for "Facebook Login" and select "Settings"
+
+Next set "Valid OAuth Redirect URIs", for example:
+
+https://5cf2-89-64-39-84.ngrok-free.app/oauth2/redirect/facebook
+
+
+https://ngrok.com
+
+1. Download ngrok
+
+2. Unpack it (double click or something)
+
+3. Connect your account using your Authtoken
+
+  ./ngrok config add-authtoken <auth-token>
+
+4. Display help
+
+  ./ngrok help
+
+5. To start a HTTP tunnel forwarding to your local port 3000, run this next:
+
+  ./ngrok http 3000
+
+ngrok                                                                                                                                                                (Ctrl+C to quit)
+                                                                                                                                                                                     
+Introducing Cloud Edges for all ngrok users: https://ngrok.com/r/cloud-edges                                                                                                         
+                                                                                                                                                                                     
+Session Status                online                                                                                                                                                 
+Account                       Dariusz Dziara (Plan: Free)                                                                                                                            
+Version                       3.3.4                                                                                                                                                  
+Region                        Europe (eu)                 // --------------------------------------------                                                                                                                           
+Latency                       36ms                        // |                                       // |                                                                                
+Web Interface                 http://127.0.0.1:4040       // |                                       // |                                                                                
+Forwarding                    https://5cf2-89-64-39-84.ngrok-free.app -> http://localhost:3000       // |                                                                                
+                                                                                                     // |                                                                                
+Connections                   ttl     opn     rt1     rt5     p50     p90                            // |                                                                                
+                              0       0       0.00    0.00    0.00    0.00                           // |                                                                                
+                                                                                                     // |
+                                                                                                     // |
+https://github.com/jaredhanson/passport-facebook                                                     // |
+                                                                                                     // |
+1. install npm modules                                                                               // |
+                                                                                                     // |
+  yarn add passport passport-facebook             // ? what is passport and is it necessary          // |
+                                                                                                     // |
+2. import modules                                                                                    // |
+                                                                                                     // |
+  import passport from "passport"                                                                    // |
+                                                                                                     // |
+  import FacebookStrategy from "passport-facebook"                                                   // |
+                                                                                                     // |
+                                                                                                     // |
+3. Configure Strategy                                                                                // | 
+                                                                                                     // |
+Note: callbackURL is from ngrok                                                                      // |  
+                                                     // -------------------------------------------------
+passport.use(new FacebookStrategy({                  // |
+    clientID: process.env['FACEBOOK_APP_ID'],        // |  
+    clientSecret: process.env['FACEBOOK_APP_SECRET'],// v
+    callbackURL: 'https://5cf2-89-64-39-84.ngrok-free.app/oauth2/redirect/facebook',
+    state: false                                           // ^
+  },                                                       // |  
+  function verify(accessToken, refreshToken, profile, cb) {// -------------------------------------------------   
+/*                                                                                                       //   | 
+    db.get('SELECT * FROM federated_credentials WHERE provider = ? AND subject = ?', [                   //   |
+      'https://www.facebook.com',                                                                        //   |
+      profile.id                                                                                         //   |
+    ], function(err, cred) {                                                                             //   |
+      if (err) { return cb(err); }                                                                       //   |
+                                                                                                         //   |
+      if (!cred) {                                                                                       //   |
+        // The account at Facebook has not logged in to this app before.  Create                         //   |  
+        // a new user record and associate it with the Facebook account.                                 //   |
+        db.run('INSERT INTO users (name) VALUES (?)', [                                                  //   |
+          profile.displayName                                                                            //   | 
+        ], function(err) {                                                                               //   |
+          if (err) { return cb(err); }                                                                   //   |
+                                                                                                         //   |
+          var id = this.lastID;                                                                          //   |
+          db.run('INSERT INTO federated_credentials (user_id, provider, subject) VALUES (?, ?, ?)', [    //   |            
+            id,                                                                                          //   |
+            'https://www.facebook.com',                                                                  //   | 
+            profile.id                                                                                   //   |
+          ], function(err) {                                                                             //   |
+            if (err) { return cb(err); }                                                                 //   |
+                                                                                                         //   | 
+            var user = {                                                                                 //   |
+              id: id,                                                                                    //   |  
+              name: profile.displayName                                                                  //   |
+            };                                                                                           //   |
+            return cb(null, user);                                                                       //   |
+          });                                                                                            //   |
+        });                                                                                              //   |
+      } else {                                                                                           //   |
+        // The account at Facebook has previously logged in to the app.  Get the                         //   |
+        // user record associated with the Facebook account and log the user in.                         //   |  
+        db.get('SELECT * FROM users WHERE id = ?', [ cred.user_id ], function(err, user) {               //   |
+          if (err) { return cb(err); }                                                                   //   |
+          if (!user) { return cb(null, false); }                                                         //   |
+          return cb(null, user);                                                                         //   |
+        });                                                                                              //   |
+      }                                                                                                  //   |
+                                                                                                         //   |
+    }); */                                                                                               //   |
+                                                                                                         //   |
+    console.log(profile);                                                                                //   |
+    cb(null, {});                                                                                        //   |
+  }                                                                                                      //   | 
+));                                                                                                      //   |
+                                                                                                         //   | 
+4. Initialize                                                                                            //   |
+                                                                                                         //   |
+   app.use(passport.initialize())                                                                         //   |                            
+                                                                                                         //   |
+                  // this is arbitrary path                                                              //   |
+5. Define routes  // |                                                                                   //   |
+                  // v                                                                                   //   |
+app.get('/login/facebook', passport.authenticate('facebook'));                                           //   |
+                                                                                                         //   |
+app.get('/oauth2/redirect/facebook',                          // ----------------------------------------------
+  passport.authenticate('facebook', { /*failureRedirect: '/login', failureMessage: true*/ session: false }),
+  function(req, res) {
+//    res.redirect('/');
+    res.send('AUTH WAS GOOD!')
+  });
+
+
+
+
+CHALENGE:
+
+  Do the same for Google, Github
