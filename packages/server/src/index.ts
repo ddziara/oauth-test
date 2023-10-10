@@ -1,110 +1,154 @@
 import express from "express";
+import bodyParser from "body-parser";
+import http from "http";
+import cors from "cors";
+import { ApolloServer } from "@apollo/server";
+import { expressMiddleware } from "@apollo/server/express4";
+import { ApolloServerPluginDrainHttpServer } from "@apollo/server/plugin/drainHttpServer";
 import passport from "passport";
 import { Strategy as FacebookStrategy } from "passport-facebook";
-import dotenv from "dotenv";
+import { Strategy as GoogleStrategy } from "passport-google-oidc";
+import { Strategy as GitHubStrategy } from "passport-github2";
 
-dotenv.config();
+import typeDefs from "./schema";
+import resolvers from "./resolvers";
+import models from "./models";
+import { GraphQLContext } from "./context";
+import { createTokens } from "./auth";
 
-const app = express();
+const SECRET = "sgrtyu6te657trghtrgh65uy7hbw56y6yhtgrset5455645y54";
 
-passport.use(
-  new FacebookStrategy(
-    {
-      clientID: process.env["FACEBOOK_APP_ID"]!,
-      clientSecret: process.env["FACEBOOK_APP_SECRET"]!,
-      callbackURL:
-        "https://4fe4-89-64-48-216.ngrok-free.app/oauth2/redirect/facebook",
-      state: false,
-    },
-    function verify(accessToken, refreshToken, profile, cb) {
-      console.log("BUBU");
-      // db.get(
-      //   "SELECT * FROM federated_credentials WHERE provider = ? AND subject = ?",
-      //   ["https://www.facebook.com", profile.id],
-      //   function (err, cred) {
-      //     if (err) {
-      //       return cb(err);
-      //     }
+const main = async () => {
+  const app = express();
+  const httpServer = http.createServer(app);
 
-      //     if (!cred) {
-      //       // The account at Facebook has not logged in to this app before.  Create
-      //       // a new user record and associate it with the Facebook account.
-      //       db.run(
-      //         "INSERT INTO users (name) VALUES (?)",
-      //         [profile.displayName],
-      //         function (err) {
-      //           if (err) {
-      //             return cb(err);
-      //           }
+  passport.use(
+    new FacebookStrategy(
+      {
+        clientID: process.env["FACEBOOK_APP_ID"]!,
+        clientSecret: process.env["FACEBOOK_APP_SECRET"]!,
+        callbackURL: `${process.env["NGROK_BASEURL"]}/oauth2/redirect/facebook`,
+        state: false,
+      },
+      async (accessToken, refreshToken, profile, cb) => {
+        // 2 cases
+        // #1 first time login
+        // #2 other times
+        const { id, displayName } = profile;
+        let fbUser = await models.FbAuth.findOne({ where: { fb_id: id } });
+        console.log(fbUser);
+        console.log(profile);
 
-      //           var id = this.lastID;
-      //           db.run(
-      //             "INSERT INTO federated_credentials (user_id, provider, subject) VALUES (?, ?, ?)",
-      //             [id, "https://www.facebook.com", profile.id],
-      //             function (err) {
-      //               if (err) {
-      //                 return cb(err);
-      //               }
+        if (!fbUser) {
+          const user = await models.User.create();
+          fbUser = await models.FbAuth.create({
+            fb_id: id,
+            display_name: displayName,
+            user_id: user.id,
+          });
+        }
 
-      //               var user = {
-      //                 id: id,
-      //                 name: profile.displayName,
-      //               };
-      //               return cb(null, user);
-      //             }
-      //           );
-      //         }
-      //       );
-      //     } else {
-      //       // The account at Facebook has previously logged in to the app.  Get the
-      //       // user record associated with the Facebook account and log the user in.
-      //       db.get(
-      //         "SELECT * FROM users WHERE id = ?",
-      //         [cred.user_id],
-      //         function (err, user) {
-      //           if (err) {
-      //             return cb(err);
-      //           }
-      //           if (!user) {
-      //             return cb(null, false);
-      //           }
-      //           return cb(null, user);
-      //         }
-      //       );
-      //     }
+        console.log(profile);
+        cb(null, fbUser);
+      }
+    )
+  );
 
-      //   }
-      // );
-      console.log("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
-      console.log(profile);
-      cb(null, {});
+  passport.use(
+    new GoogleStrategy(
+      {
+        clientID: process.env["GOOGLE_CLIENT_ID"]!,
+        clientSecret: process.env["GOOGLE_CLIENT_SECRET"]!,
+        callbackURL: "/oauth2/redirect/google",
+      },
+      (issuer, profile, cb) => {
+        console.log(profile);
+        cb(null, {});
+      }
+    )
+  );
+
+  passport.use(
+    new GitHubStrategy(
+      {
+        clientID: process.env["GITHUB_CLIENT_ID"]!,
+        clientSecret: process.env["GITHUB_CLIENT_SECRET"]!,
+        callbackURL: `${process.env["NGROK_BASEURL"]}/auth/github/callback`,
+        state: false,
+      },
+      (accessToken, refreshToken, profile, done) => {
+        console.log(profile);
+        done(null, {});
+      }
+    )
+  );
+
+  // app.use(passport.initialize());
+  // Set up Apollo Server
+  const server = new ApolloServer<GraphQLContext>({
+    typeDefs,
+    resolvers,
+    plugins: [ApolloServerPluginDrainHttpServer({ httpServer })],
+  });
+
+  await server.start();
+
+  app.use(
+    "/graphql",
+    cors(),
+    bodyParser.json(),
+    expressMiddleware(server, { context: async ({ req, res }) => ({ models }) })
+  );
+
+  app.get("/", (req: any, res: any) => {
+    res.send("hello world");
+  });
+
+  app.get("/login/facebook", passport.authenticate("facebook"));
+  app.get("/login/google", passport.authenticate("google"));
+  app.get("/login/github", passport.authenticate("github", { scope: [] }));
+
+  app.get(
+    "/oauth2/redirect/facebook",
+    passport.authenticate("facebook", {
+      /*failureRedirect: '/login', failureMessage: true*/ session: false,
+    }),
+    async (req, res) => {
+      const [token, refreshToken] = await createTokens(req.user, SECRET);
+      res.redirect(`http://192.168.0.8:8080/home?token=${token}&refreshToken=${refreshToken}`);
     }
-  )
-);
+  );
 
-// app.use(passport.initialize());
+  app.get(
+    "/oauth2/redirect/google",
+    passport.authenticate("google", {
+      /*successRedirect: "/",
+    failureRedirect: "/login",*/
+      session: false,
+    }),
+    function (req, res) {
+      //    res.redirect('/');
+      res.send("GOOGLE AUTH WAS GOOD!");
+    }
+  );
 
-app.get("/", (req: any, res: any) => {
-  res.send("hello world");
-});
+  app.get(
+    "/auth/github/callback",
+    passport.authenticate("github", {
+      /*failureRedirect: '/login'*/ session: false,
+    }),
+    function (req, res) {
+      res.send("GITHUB AUTH WAS GOOD!");
+    }
+  );
 
-app.get("/login/facebook", passport.authenticate("facebook"));
+  await models.sequelize.sync({ alter: true });
 
-app.get(
-  "/oauth2/redirect/facebook", (req, res, next) => { 
-    console.log(req.headers); 
-    console.log(req.body);
-    next(); 
- },
-  passport.authenticate("facebook", {
-    /*failureRedirect: '/login', failureMessage: true*/ session: false,
-  }),
-  function (req, res) {
-    //    res.redirect('/');
-    res.send("AUTH WAS GOOD!");
-  }
-);
+  await new Promise((resolve) =>
+    httpServer.listen({ port: 3000 }, resolve as () => void)
+  );
 
-app.listen(3000, () => {
-  console.log("listening on port 3000")
-});
+  console.log("listening on port 3000");
+};
+
+main();

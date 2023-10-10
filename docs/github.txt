@@ -1,0 +1,4 @@
+Register a new app
+
+https://github.com/settings/applications/new
+

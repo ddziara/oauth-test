@@ -1,0 +1,1 @@
+{"version":3,"file":"modelEx.js","sourceRoot":"","sources":["../../src/models/modelEx.ts"],"names":[],"mappings":";;;AAAA,yCAAuF;AAKvF,MAAa,OAAmH,SAAQ,iBAGvI;IACG,MAAM,CAAC,UAAU,CAAC,SAAoB;QAClC,MAAM,IAAI,KAAK,CAAC,kCAAkC,CAAC,CAAC;IACxD,CAAC;IAED,MAAM,CAAC,SAAS,CAAC,MAAiB;QAC9B,MAAM,IAAI,KAAK,CAAC,iCAAiC,CAAC,CAAC;IACvD,CAAC;CACJ;AAXD,0BAWC"}

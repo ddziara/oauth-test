@@ -1,0 +1,2 @@
+yarn add -D typescript
+yarn tsc --init
